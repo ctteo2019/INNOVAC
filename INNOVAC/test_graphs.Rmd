@@ -1,0 +1,165 @@
+---
+title: "Project UAT"
+author: "Lance"
+date: "22/04/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(shiny)
+library(shinythemes)
+library(tidyverse)
+library(tmap)
+library(sf)
+library(countrycode)
+library(plotly)
+
+data <- read_csv("data/gii_dataset_2015-2020_wide_score.csv")
+```
+
+```{r}
+library(CGPfunctions)
+
+cty_ranked <- data %>%
+    arrange(desc(`GLOBAL INNOVATION INDEX`)) %>%
+    select(Country) %>%
+    unique() %>%
+    as.matrix()
+
+slope_data <- data %>%
+  group_by(Country) %>%
+  mutate(Earliest.Year = min(Year)) %>%
+  select(Country, Earliest.Year) %>%
+  distinct() %>%
+  expand(Year = Earliest.Year:2020, Earliest.Year) %>%
+  select(-Earliest.Year) %>%
+  left_join(data, by = c("Country", "Year")) %>%
+  select(-Category) %>%
+  replace(is.na(.), 0) %>%
+  select(Country, Year, `GLOBAL INNOVATION INDEX`) %>%
+  mutate(Year = as.ordered(Year)) %>%
+  mutate(indicator = `GLOBAL INNOVATION INDEX`)%>%
+  filter(Country %in% cty_ranked[1:20])
+  
+
+newggslopegraph(dataframe = slope_data,
+                Times = Year,
+                Measurement = indicator,
+                Grouping = Country,
+                Title = "Estimates of Percent Survival Rates",
+                SubTitle = "Based on: Edward Tufte, Beautiful Evidence, 174, 176.",
+                Caption = NULL
+                )
+
+```
+```{r}
+
+library(ggplot2)
+library(gganimate)
+
+data_2 <- data %>%
+  group_by(Country) %>%
+  mutate(Earliest.Year = min(Year)) %>%
+  select(Country, Earliest.Year) %>%
+  distinct() %>%
+  expand(Year = Earliest.Year:2020, Earliest.Year) %>%
+  select(-Earliest.Year) %>%
+  left_join(data, by = c("Country", "Year")) %>%
+  select(-Category) %>%
+  replace(is.na(.), 0) %>%
+  mutate(Year = as.integer(Year))
+
+p <- ggplot(data_2, aes(x = `2.3.2. Gross expenditure on R&D (GERD)`, 
+                 y = `1.3.1. Ease of starting a business`, 
+                 size = `GLOBAL INNOVATION INDEX`,
+                 color = Country)) +
+  geom_point(alpha = 0.5, show.legend = F) +
+  guides(size = guide_legend(override.aes = list(size = c(1,3,5,14)))) +
+  transition_time(Year) +
+  ease_aes('linear') +
+  labs(title = 'Year: {frame_time}')
+
+p
+
+```
+
+
+```{r}
+p <- ggplot(iris, aes(x = Petal.Width, y = Petal.Length)) + 
+  geom_point()
+
+
+anim <- p + 
+  transition_states(Species,
+                    transition_length = 2,
+                    state_length = 1)
+
+anim
+```
+```{r}
+library(gapminder)
+gapminder
+```
+
+```{r}
+library(corrplot)
+
+df <- data %>%
+  select(-Country, -Year, -Category) %>%
+  replace(is.na(.), 0)
+
+corrplot(cor(df), diag = FALSE, order = "FPC", tl.pos = "td", tl.cex = 0.5, method = "color", type = "upper")
+
+
+
+
+```
+
+```{r}
+library(ggstatsplot)
+
+data_2 <- data_2 %>%
+    mutate(iso3 = countrycode(Country, origin = 'country.name.en', destination = 'iso3c')) %>%
+    mutate(region = countrycode(Country, origin = 'country.name.en', destination = 'un.region.name'))
+
+ggbetweenstats(
+  data = data_2 %>%
+         filter(Year == 2020),
+  x = region, 
+  y = `GLOBAL INNOVATION INDEX`, 
+  title = 'Scatter + Box + Violin',
+  type = 'parametric',
+  conf.level = 0.95,
+  pairwise.comparisons = TRUE,
+  pairwise.display = 'significant', 
+  p.adjust.method = 'holm', 
+  ggtheme = ggplot2::theme_classic()
+)
+
+
+
+
+```
+
+
+```{r}
+
+ggbetweenstats(
+  data = data_2 %>%
+         filter(Year == 2020) %>% mutate(indicator = `3. Infrastructure`),
+  x = region, 
+  y = indicator, 
+  title = 'Scatter + Box + Violin',
+  type = 'parametric',
+  conf.level = 0.95,
+  pairwise.comparisons = TRUE,
+  pairwise.display = 'significant', 
+  p.adjust.method = 'holm', 
+  ggtheme = ggplot2::theme_classic()
+)
+```
+
